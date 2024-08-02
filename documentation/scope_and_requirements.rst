@@ -48,3 +48,9 @@
 **Assumptions**:
 - Users have basic knowledge of spacecraft navigation.
 - Adequate computational resources are available for real-time calculations.
+
+**Acceptance Criteria**:
+- Trajectories solve and plot in less than half a second after the boundary points
+	are set.
+- Users can choose set time-of-flight, thrust, spacecraft mass, pro- or retro-
+	grade, planet mass, and planet diameter.

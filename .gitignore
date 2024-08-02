@@ -1,4 +1,14 @@
+# My extra documentation #
 *.docx
+
+# Compiled source files
 *.ilk
 *.obj
 *.pdb
+*.exe
+
+# VS Code configuration files
+.vscode/
+
+# OS generated files
+._*
