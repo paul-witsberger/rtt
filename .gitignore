@@ -12,3 +12,8 @@
 
 # OS generated files
 ._*
+
+# Hello world folders
+/resources/hello_world/
+/resources/qt_hello_world/
+/resources/blog-vscode-template-main.zip
