@@ -1,5 +1,6 @@
 # My extra documentation #
-*.docx
+documentation/*.docx
+documentation/work notes.txt
 
 # Compiled source files
 *.ilk
