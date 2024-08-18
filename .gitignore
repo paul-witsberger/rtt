@@ -8,9 +8,6 @@ documentation/work notes.txt
 *.pdb
 *.exe
 
-# VS Code configuration files
-.vscode/
-
 # OS generated files
 ._*
 

@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "qt6",
+            "includePath": [
+                "${workspaceFolder}/**"
+                // "${workspaceFolder}/src/widget",
+                // "${QT_DIR}/include"
+            ],
+            "cppStandard": "c++20",
+            "configurationProvider": "ms-vscode.cpptools",
+            "compilerPath": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.30.30705/bin/Hostx64/x64/cl.exe",
+            "intelliSenseMode": "msvc-x64"
+        }
+    ],
+    "version": 4
+}

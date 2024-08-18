@@ -1,0 +1,3 @@
+project(rtt)
+
+set(CMAKE_CXX_STANDARD 23)
