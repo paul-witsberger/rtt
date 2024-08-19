@@ -15,3 +15,6 @@ documentation/work notes.txt
 /resources/hello_world/
 /resources/qt_hello_world/
 /resources/blog-vscode-template-main.zip
+
+# CMake build directory
+/build/

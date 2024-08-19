@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "rtt",
+            "name": "Launch rtt",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\main.exe",
+            "program": "${workspaceFolder}/bin/main.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

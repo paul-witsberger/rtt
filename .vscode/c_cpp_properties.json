@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "qt6",
+            "name": "rtt",
             "includePath": [
                 "${workspaceFolder}/**"
                 // "${workspaceFolder}/src/widget",

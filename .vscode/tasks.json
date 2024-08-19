@@ -2,7 +2,68 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-S",
+                ".",
+                "-B",
+                "build",
+                "-DCMAKE_INSTALL_PREFIX=${workspaceFolder}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+        {
             "label": "build",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "build",
+                "--target",
+                "install",
+                "--config",
+                "Debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": [
+                "configure"
+            ]
+        },
+        {
+            "label": "install",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--install",
+                "bin"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "build"
+            ],
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+        {
+            "label": "test",
             "type": "shell",
             "command": "cl",
             "args": [
@@ -13,8 +74,8 @@
                 "/EHsc"
             ],
             "group": {
-                "kind": "build",
-                "isDefault": true
+                "kind": "test",
+                "isDefault": false
             },
             "problemMatcher": [
                 "$msCompile"

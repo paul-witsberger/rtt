@@ -52,6 +52,7 @@
     },
     "cmake.buildDirectory": "${workspaceFolder}/build",
     "cmake.cmakePath": "C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe",
+    "cmake.installPrefix": "{workspaceFolder}",
     "files.trimTrailingWhitespace": true,
     "editor.formatOnSave": true,
     "editor.buildOnSave": true,
