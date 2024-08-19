@@ -55,7 +55,6 @@
     "cmake.installPrefix": "{workspaceFolder}",
     "files.trimTrailingWhitespace": true,
     "editor.formatOnSave": true,
-    "editor.buildOnSave": true,
     "cmake.sourceDirectory": "C:/Users/Paul/Documents/codes/rtt/src/",
     "cmake.options.statusBarVisibility": "visible",
     "C_Cpp.default.cppStandard": "c++20",

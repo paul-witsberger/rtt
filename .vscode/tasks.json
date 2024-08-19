@@ -44,25 +44,6 @@
             ]
         },
         {
-            "label": "install",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--install",
-                "bin"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "dependsOn": [
-                "build"
-            ],
-            "problemMatcher": [
-                "$msCompile"
-            ]
-        },
-        {
             "label": "test",
             "type": "shell",
             "command": "cl",
