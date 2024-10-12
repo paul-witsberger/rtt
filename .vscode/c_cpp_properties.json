@@ -3,9 +3,13 @@
         {
             "name": "rtt",
             "includePath": [
-                "${workspaceFolder}/**"
-                // "${workspaceFolder}/src/widget",
-                // "${QT_DIR}/include"
+                "${workspaceFolder}/**",
+                "C:/Qt/6.7.2/msvc2019_64/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
             ],
             "cppStandard": "c++20",
             "configurationProvider": "ms-vscode.cpptools",
