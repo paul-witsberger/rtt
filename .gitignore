@@ -17,3 +17,6 @@ documentation/work notes.txt
 
 # CMake build directory
 /build/
+
+# Python venv
+/venv_py_rtt/
