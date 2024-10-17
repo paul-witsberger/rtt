@@ -1,8 +1,9 @@
 import sys
 import numpy as np
-from PyQt6.QtCore import Qt, QPointF
-from PyQt6.QtGui import QAction, QColor, QContextMenuEvent, QMouseEvent, QPalette
-from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QHBoxLayout, QLabel, QMainWindow, QMenu, QPushButton, QSlider, QTabWidget, QVBoxLayout, QWidget
+import pickle
+from PyQt6.QtCore import Qt, QPointF, QSize
+from PyQt6.QtGui import QAction, QColor, QContextMenuEvent, QMouseEvent, QPalette, QResizeEvent
+from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton, QSlider, QTabWidget, QVBoxLayout, QWidget
 import pyqtgraph as pg
 
 
@@ -42,102 +43,99 @@ class CustomDialog(QDialog):
         self.setLayout(layout)
 
 
-# Create a subclass for QMainWindow to create a custom window.
-class Label(QLabel):
-    def __init__(self, text: str):
-        super().__init__(text)
-        # Track the mouse movement even when no mouse button is pressed.
-        self.setMouseTracking(True)
-        # Center the text in the label widget.
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        self.setText("Mouse move event at (" + str(event.pos().x()) + ", " + str(event.pos().y()) + ")")
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        self.setText("Mouse press event: " + str(event.button()))
-        super().mousePressEvent(event)
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self.setText("Mouse release event: " + str(event.button()))
-        super().mouseReleaseEvent(event)
-
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        self.setText("Mouse double click event: " + str(event.button()))
-        super().mouseDoubleClickEvent(event)
-
-
 # Create a subclass for pg.PlotWidget to handle mouse events.
 class PlotWidget(pg.PlotWidget):
-    def __init__(self, getLayoutMargins):
+    def __init__(self, parent, getLayoutMargins):
         super().__init__()
+        self.parent = parent
         self.getLayoutMargins = getLayoutMargins
         self.setMouseTracking(True)
         self.last_clicked = 'end'
-        self.start = np.zeros(2, dtype=float)
-        self.end = np.zeros(2, dtype=float)
+        self.start = np.array((self.parent.init_position[0]), dtype=float)
+        self.end = np.array((self.parent.init_position[1]), dtype=float)
         self.n_steps = 10
-        self.pen = pg.mkPen(color=QColor(240, 240, 240), width=2, style=Qt.PenStyle.SolidLine)
+        self.pen = pg.mkPen(color=QColor(100, 100, 255), width=2, style=Qt.PenStyle.SolidLine)
         self.viewbox = self.getViewBox()
         self.viewbox.setRange(xRange=[0, 1000], yRange=[0, 1000], padding=0)
-        self.viewbox.setAspectLocked(False)
-        self.viewbox.setMouseEnabled(x=False, y=False)  # Disable mouse interaction to avoid interference
+        self.viewbox.setAspectLocked(True)
         self.plotItem = self.getPlotItem()
-        self.plotItem.setMouseEnabled(x=False, y=False)  # Disable mouse interaction to avoid interference
         self.plotItem.showGrid(x=True, y=True, alpha=0.3)  # Optional: Show grid for better visualization
-        self.plotItem.setContentsMargins(0, 0, 0, 0)  # Ensure no margins around the plot area
+        self.plot_initialized = False
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        event.ignore()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        " Update the graph when the mouse is moved. "
+        if event.buttons() == Qt.MouseButton.LeftButton or event.buttons() == Qt.MouseButton.RightButton:
+            self.update_graph(event)
+        super().mouseMoveEvent(event)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         " Capture the mouse event, update the graph, and the pass the event up."
-        print("Clicked the graph")
         self.update_graph(event)
-        super().mousePressEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton or event.button() == Qt.MouseButton.RightButton:
+            event.ignore()
+        else:
+            super().mousePressEvent(event)
+
+    def reload(self):
+        self.plot_initialized = True
+        self.start[:] = [self.x_data[0], self.y_data[0]]
+        self.end[:] = [self.x_data[-1], self.y_data[-1]]
+        self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('white'), symbolPen=None, clear=True)
+        self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
+        self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
+        self.viewbox.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=False)
+        self.parent.update_position_label(self.start, self.end)
 
     def update_graph(self, event=None):
         " Update the graph with a new trajectory "
+        is_updated = False
         # Check if the event is a left mouse button press event.
-        if event is not None and event.button() == Qt.MouseButton.LeftButton:
+        if event is not None and (event.button() == Qt.MouseButton.LeftButton or event.button() == Qt.MouseButton.RightButton or event.type() == QMouseEvent.Type.MouseMove):
+            # Get the position of the mouse event. It must be a float so that the output is a QPointF.
             pos = event.pos().toPointF()
-            print(f"Mouse click at ({pos.x()}, {pos.y()})")
             # Get the geometries
             viewbox_geom = self.viewbox.geometry()
             plot_geom = self.geometry()
-
             # Calculate the width of the axes
-            print(f"Layout margins: {self.getLayoutMargins()}")
             left_axis_width = viewbox_geom.left() - plot_geom.left() + self.getLayoutMargins()[0]
-            # bottom_axis_height = plot_geom.bottom() - viewbox_geom.bottom()
-            # bottom_axis_height = self.getLayoutMargins()[3]
-
-            print(f"ViewBox Geometry: {viewbox_geom}")
-            print(f"Plot Geometry: {plot_geom}")
-            print(f"Left Axis Width: {left_axis_width}")
-
             # Adjust the position by the width of the axes
-            adjusted_pos = pos - QPointF(left_axis_width, 0)
-            print(f"Adjusted Mouse click at ({adjusted_pos.x()}, {adjusted_pos.y()})")
-
+            adjusted_pos = pos - QPointF(left_axis_width, 1)
+            # Convert the adjusted position to data coordinates
             data_pos = self.viewbox.mapToView(adjusted_pos)
             data_x = data_pos.x()
             data_y = data_pos.y()
-            print(f"Data position: ({data_x}, {data_y})")
-            print(f"Data position types: ({type(data_x)}, {type(data_y)})")
-            if self.last_clicked == 'start':
+            # Update the start or end point based on which mouse button is pressed.
+            if event.button() == Qt.MouseButton.RightButton or (event.type() == QMouseEvent.Type.MouseMove and self.last_press == Qt.MouseButton.RightButton):
+                self.last_press = Qt.MouseButton.RightButton
                 self.end[:] = [data_x, data_y]
-                self.last_clicked = 'end'
-            else:
+            elif event.button() == Qt.MouseButton.LeftButton or (event.type() == QMouseEvent.Type.MouseMove and self.last_press == Qt.MouseButton.LeftButton):
+                self.last_press = Qt.MouseButton.LeftButton
                 self.start[:] = [data_x, data_y]
-                self.last_clicked = 'start'
-        print(f"Start: {self.start[0]}, {self.start[1]}")
-        print(f"End: {self.end[0]}, {self.end[1]}")
-        self.x_data = np.linspace(self.start[0], self.end[0], self.n_steps)
-        self.y_data = np.linspace(self.start[1], self.end[1], self.n_steps)
-        self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('blue'), symbolPen=None, clear=True)
-        self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
-        self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
+            is_updated = True
+        # Check if the user has entered new coordinates in the input fields.
+        elif (self.parent.position_label_start_x.text() != '') and \
+                (self.start[0] != float(self.parent.position_label_start_x.text()) or \
+                self.start[1] != float(self.parent.position_label_start_y.text()) or \
+                self.end[0] != (self.parent.position_label_end_x.text()) or\
+                self.end[1] != (self.parent.position_label_end_y.text())):
+            self.start[:] = [float(self.parent.position_label_start_x.text()), float(self.parent.position_label_start_y.text())]
+            self.end[:] = [float(self.parent.position_label_end_x.text()), float(self.parent.position_label_end_y.text())]
+            is_updated = True
 
-        # Prevent autoscaling of the graph after updating the graph.
-        self.viewbox.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=False)
+        # Only update the graph if the coordinates have changed.
+        if is_updated or not self.plot_initialized:
+            self.x_data = np.linspace(self.start[0], self.end[0], self.n_steps)
+            self.y_data = np.linspace(self.start[1], self.end[1], self.n_steps)
+            self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('white'), symbolPen=None, clear=True)
+            self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
+            self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
+            self.plot_initialized = True
+            # Prevent autoscaling of the graph after updating the graph.
+            self.viewbox.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=False)
+            self.parent.update_position_label(self.start, self.end)
 
 
 class MainWindow(QMainWindow):
@@ -151,29 +149,69 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.ColorRole.Window, QColor(color))
         self.setPalette(palette)
         self.setMouseTracking(True)
+        self.init_position = ([250, 250], [750, 750])
 
         # The window is split into two main sections; controls on the left, and a graph on the right.
-        # The left side will consist of tabs for different types of controls, with the tabs implemented by QTabWidget.
+        # The left side will consist of self.tabs for different types of controls, with the self.tabs implemented by QTabWidget.
 
         # Add a layout for the left side of the window
-        tabs = QTabWidget()
-        tabs.setTabPosition(QTabWidget.TabPosition.North)
-        tabs.setTabShape(QTabWidget.TabShape.Rounded)
+        self.tabs = QTabWidget()
+        self.tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.tabs.setTabShape(QTabWidget.TabShape.Rounded)
 
         layout_left_tab1 = QVBoxLayout()
 
-        widget = Label("Put the mouse in this window.")
-        widget.setMouseTracking(True)
-        widget.setAutoFillBackground(True)
-        widget.setStyleSheet("background-color: rgb(100, 100, 100)")
-        layout_left_tab1.addWidget(widget)
+        # Create a frame around the position input fields.
+        frame = QFrame()
+        frame.setFrameShape(QFrame.Shape.Box)
+        frame.setLineWidth(2)
 
-        widget = QLabel("Hello")
-        font = widget.font()
-        font.setPointSize(30)
-        widget.setFont(font)
-        widget.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        layout_left_tab1.addWidget(widget)
+        widget = QWidget()
+        position_layout = QVBoxLayout()
+        # Add a label for this box.
+        label = QLabel("Position")
+        # Center the label horizontally and align it to the top.
+        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        position_layout.addWidget(label)
+        # Add a label and two input fields for the start position.
+        layout = QHBoxLayout()
+        label = QLabel("Start:")
+        self.position_label_start_x = QLineEdit()
+        self.position_label_start_y = QLineEdit()
+        self.position_label_start_x.returnPressed.connect(lambda: self.update_position())
+        self.position_label_start_y.returnPressed.connect(lambda: self.update_position())
+        layout.addWidget(label)
+        layout.addWidget(self.position_label_start_x)
+        layout.addWidget(self.position_label_start_y)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        position_layout.addLayout(layout)
+        # Add a label and two input fields for the end position.
+        layout = QHBoxLayout()
+        label = QLabel("End:")
+        self.position_label_end_x = QLineEdit()
+        self.position_label_end_y = QLineEdit()
+        self.position_label_end_x.returnPressed.connect(lambda: self.update_position())
+        self.position_label_end_y.returnPressed.connect(lambda: self.update_position())
+        layout.addWidget(label)
+        layout.addWidget(self.position_label_end_x)
+        layout.addWidget(self.position_label_end_y)
+        position_layout.addLayout(layout)
+        # Add an apply and reset button.
+        layout = QHBoxLayout()
+        button = QPushButton("Apply")
+        button.clicked.connect(lambda: self.update_position())
+        layout.addWidget(button)
+        button = QPushButton("Reset")
+        button.clicked.connect(lambda: self.update_position('reset'))
+        layout.addWidget(button)
+        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
+        position_layout.addLayout(layout)
+        position_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        widget.setLayout(position_layout)
+        frame.setLayout(position_layout)
+        layout_left_tab1.addWidget(frame)
+        self.position_frame = frame
+        self.position_frame.setFixedHeight(int(self.tabs.height() * 0.5))
 
         widget = QCheckBox()
         widget.setCheckState(Qt.CheckState.Checked)
@@ -184,9 +222,20 @@ class MainWindow(QMainWindow):
         widget.clicked.connect(self.open_dialog)
         layout_left_tab1.addWidget(widget)
 
+        layout = QHBoxLayout()
+        # Add a save button that opens a save dialog.
+        widget = QPushButton("Save")
+        widget.clicked.connect(self.save_file)
+        layout.addWidget(widget)
+        # Add a load button that opens a load dialog.
+        widget = QPushButton("Load")
+        widget.clicked.connect(self.load_file)
+        layout.addWidget(widget)
+        layout_left_tab1.addLayout(layout)
+
         widget_left_tab1 = QWidget()
         widget_left_tab1.setLayout(layout_left_tab1)
-        tabs.addTab(widget_left_tab1, "Tab 1")
+        self.tabs.addTab(widget_left_tab1, "Tab 1")
 
         layout_left_tab2 = QVBoxLayout()
 
@@ -212,29 +261,24 @@ class MainWindow(QMainWindow):
 
         widget_left_tab2 = QWidget()
         widget_left_tab2.setLayout(layout_left_tab2)
-        tabs.addTab(widget_left_tab2, "Tab 2")
+        self.tabs.addTab(widget_left_tab2, "Tab 2")
 
         # Set properties of the layout on the left side of the window.
-        tabs.setMinimumSize(400, 300)
-        tabs.setMaximumSize(800, 600)
-        tabs.setAutoFillBackground(True)
-        palette = tabs.palette()
+        self.tabs.setMinimumSize(400, 300)
+        self.tabs.setMaximumSize(800, 600)
+        self.tabs.setAutoFillBackground(True)
+        palette = self.tabs.palette()
         color = (100, 20, 20)
         palette.setColor(QPalette.ColorRole.Window, QColor(*color))
-        tabs.setPalette(palette)
+        self.tabs.setPalette(palette)
 
         # Add a layout that can be used to display a graph on the right side of the window.
         self.layout_right = QVBoxLayout()
-        print("Initial margins:", self.layout_right.getContentsMargins())
-        # self.layout_right.setContentsMargins(0, 0, 0, 0)
         getLayoutMargins = self.layout_right.getContentsMargins
-        self.graph = PlotWidget(getLayoutMargins)
+        self.graph = PlotWidget(parent=self, getLayoutMargins=getLayoutMargins)
         self.layout_right.addWidget(self.graph)
-        print("Margins after adding graph widget:", self.layout_right.getContentsMargins())
-        color = QColor(100, 100, 100, 200)
+        color = QColor(50, 50, 50)
         self.graph.setBackground(color)
-        self.graph.start[:] = np.array([0, 0])
-        self.graph.end[:] = np.array([10, 10])
         self.graph.update_graph()
 
         # Set properties of the layout on the right side of the window.
@@ -244,11 +288,10 @@ class MainWindow(QMainWindow):
         widget_right.setMaximumSize(800, 600)
         widget_right.setStyleSheet("background-color: rgb(20, 100, 20)")
         widget_right.setMouseTracking(True)
-        print("Margins after setting layout to widget_right:", self.layout_right.getContentsMargins())
 
         # Add the left and right layouts to the main layout of the window.
         layout_main = QHBoxLayout()
-        layout_main.addWidget(tabs)
+        layout_main.addWidget(self.tabs)
         layout_main.addWidget(widget_right)
         layout_main.setSpacing(10)
 
@@ -261,20 +304,38 @@ class MainWindow(QMainWindow):
         self.resize(1000, 600)
         self.setMinimumSize(800, 600)
         self.setMaximumSize(1600, 1200)
-        print("Margins at the end of __init__:", self.layout_right.getContentsMargins())
+        # self.resizeEvent(QResizeEvent(QSize(1000, 600), self.size()))
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         " Create a custom context menu. "
-        # Create a context menu.
-        context_menu = QMenu(self)
-        # Add an action to the context menu.
-        action = QAction("Exit", self)
-        # Connect the action to the exit() method.
-        action.triggered.connect(QApplication.quit)
-        # Add the action to the context menu.
-        context_menu.addAction(action)
-        # Execute the context menu.
-        context_menu.exec(event.globalPos())
+        plot_widget_rect = self.graph.geometry()
+        plot_widget_rect.moveTopLeft(self.graph.mapTo(self, plot_widget_rect.topLeft()))
+        if plot_widget_rect.contains(event.pos()):
+            self.graph.contextMenuEvent(event)
+            event.ignore()
+        else:
+            # Create a context menu.
+            context_menu = QMenu(self)
+            # Add an action to the context menu.
+            action = QAction("Exit", self)
+            # Connect the action to the exit() method.
+            action.triggered.connect(QApplication.quit)
+            # Add the action to the context menu.
+            context_menu.addAction(action)
+            # Execute the context menu.
+            context_menu.exec(event.globalPos())
+
+    def load_file(self):
+        " Open a load dialog. "
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "data", "Pickle (*.pkl)")
+        if file_name:
+            try:
+                with open(file_name, 'rb') as file:
+                    self.graph.x_data, self.graph.y_data = pickle.load(file)
+                    print(f"File loaded from: {file_name}")
+                    self.graph.reload()
+            except Exception as e:
+                print(f"Error: {e}")
 
     def open_dialog(self):
         " Open a dialog window. "
@@ -290,9 +351,44 @@ class MainWindow(QMainWindow):
             else:
                 self.w = None
 
+    def resizeRefresh(self):
+        self.resizeEvent(QResizeEvent(self.size(), self.size()))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        new_height = int(self.tabs.height() * 0.25)
+        self.position_frame.setFixedHeight(new_height)
+
+    def save_file(self):
+        " Open a save dialog. "
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save File", "data/trajectory.pkl", "Pickle (.pkl)")
+        if file_name:
+            try:
+                with open(file_name, 'wb') as file:
+                    pickle.dump([self.graph.x_data, self.graph.y_data], file, pickle.HIGHEST_PROTOCOL)
+                    print(f"File saved to: {file_name}")
+            except Exception as e:
+                print(f"Error: {e}")
+
     def show_state(self, state):
         " Print the state of the checkbox. "
         print(f"Checkbox state: {state}")
+
+    def update_position(self, flag=None):
+        " Update the position of the start and end points. "
+        if flag == 'reset':
+            self.position_label_start_x.setText(str(self.init_position[0][0]))
+            self.position_label_start_y.setText(str(self.init_position[0][1]))
+            self.position_label_end_x.setText(str(self.init_position[1][0]))
+            self.position_label_end_y.setText(str(self.init_position[1][1]))
+        self.graph.update_graph()
+
+    def update_position_label(self, start, end):
+        " Update the displayed text of the position input fields. "
+        self.position_label_start_x.setText(str(start[0]))
+        self.position_label_start_y.setText(str(start[1]))
+        self.position_label_end_x.setText(str(end[0]))
+        self.position_label_end_y.setText(str(end[1]))
 
 
 if __name__ == "__main__":
@@ -302,20 +398,6 @@ if __name__ == "__main__":
     window = MainWindow()
     # A window without a parent is not displayed. The window is displayed by calling the show() method.
     window.show()
+    window.resizeRefresh()
     # Call the QApplication.exec() method to start the event loop.
     app.exec()
-
-# class MainWindow(QMainWindow):
-#     def __init__(self):
-#         super(MainWindow, self).__init__()
-#         self.setWindowTitle("PyQtGraph Example")
-#         self.setGeometry(100, 100, 800, 600)
-#         self.plot_widget = PlotWidget()
-#         self.setCentralWidget(self.plot_widget)
-
-
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     window = MainWindow()
-#     window.show()
-#     sys.exit(app.exec())
