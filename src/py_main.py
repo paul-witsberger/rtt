@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 from PyQt6.QtCore import Qt, QPointF, QSize
 from PyQt6.QtGui import QAction, QColor, QContextMenuEvent, QMouseEvent, QPalette, QResizeEvent
-from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton, QSlider, QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFrame, QGraphicsEllipseItem, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton, QSlider, QTabWidget, QVBoxLayout, QWidget
 import pyqtgraph as pg
 
 
@@ -45,7 +45,7 @@ class CustomDialog(QDialog):
 
 # Create a subclass for pg.PlotWidget to handle mouse events.
 class PlotWidget(pg.PlotWidget):
-    def __init__(self, parent, getLayoutMargins):
+    def __init__(self, parent, getLayoutMargins, show_grid=False):
         super().__init__()
         self.parent = parent
         self.getLayoutMargins = getLayoutMargins
@@ -54,16 +54,39 @@ class PlotWidget(pg.PlotWidget):
         self.start = np.array((self.parent.init_position[0]), dtype=float)
         self.end = np.array((self.parent.init_position[1]), dtype=float)
         self.n_steps = 10
-        self.pen = pg.mkPen(color=QColor(100, 100, 255), width=2, style=Qt.PenStyle.SolidLine)
-        self.viewbox = self.getViewBox()
-        self.viewbox.setRange(xRange=[0, 1000], yRange=[0, 1000], padding=0)
-        self.viewbox.setAspectLocked(True)
+        self.pen = pg.mkPen(color=QColor(150, 150, 150), width=2, style=Qt.PenStyle.SolidLine)
         self.plotItem = self.getPlotItem()
-        self.plotItem.showGrid(x=True, y=True, alpha=0.3)  # Optional: Show grid for better visualization
+        self.show_grid = show_grid
+        if self.show_grid:
+            self.plotItem.showGrid(x=True, y=True, alpha=0.3)  # Optional: Show grid for better visualization
         self.plot_initialized = False
+        self.clear_plot = False
+        self.trajectory = None
+        self.start_point = None
+        self.end_point = None
+        self.planet = None
+        self.viewbox = self.getViewBox()
+        self.viewbox_scale = 3
+        # Set the aspect ratio of the graph to be equal.
+        self.plotItem.setAspectLocked(True, ratio=1)
+        self.viewbox.setRange(xRange=[-self.viewbox_scale * self.parent.planet_radius, self.viewbox_scale * self.parent.planet_radius],
+                              yRange=[-self.viewbox_scale * self.parent.planet_radius, self.viewbox_scale * self.parent.planet_radius])
+        color = QColor(20, 20, 20)
+        self.setBackground(color)
+        self.update_graph()
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         event.ignore()
+
+    def draw_planet(self):
+        if self.planet:
+            self.removeItem(self.planet)
+        self.planet = QGraphicsEllipseItem(-self.parent.planet_radius, -self.parent.planet_radius,
+                                           2 * self.parent.planet_radius, 2 * self.parent.planet_radius)
+        planet_color = QColor(0, 50, 255)
+        self.planet.setBrush(planet_color)
+        self.planet.setPen(planet_color)
+        self.addItem(self.planet)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         " Update the graph when the mouse is moved. "
@@ -79,13 +102,25 @@ class PlotWidget(pg.PlotWidget):
         else:
             super().mousePressEvent(event)
 
+    def plot_trajectory(self):
+        # Remove previous items if they exist
+        if self.trajectory:
+            self.removeItem(self.trajectory)
+        if self.start_point:
+            self.removeItem(self.start_point)
+        if self.end_point:
+            self.removeItem(self.end_point)
+        # Plot the new trajectory
+        brush_color = QColor('white')
+        self.trajectory = self.plot(self.x_data, self.y_data, pen=self.pen, symbol='o', symbolSize=5, symbolBrush=brush_color, symbolPen=None, clear=self.clear_plot)
+        self.start_point = self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15, symbolPen=None)
+        self.end_point = self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15, symbolPen=None)
+
     def reload(self):
         self.plot_initialized = True
         self.start[:] = [self.x_data[0], self.y_data[0]]
         self.end[:] = [self.x_data[-1], self.y_data[-1]]
-        self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('white'), symbolPen=None, clear=True)
-        self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
-        self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
+        self.plot_trajectory()
         self.viewbox.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=False)
         self.parent.update_position_label(self.start, self.end)
 
@@ -129,13 +164,16 @@ class PlotWidget(pg.PlotWidget):
         if is_updated or not self.plot_initialized:
             self.x_data = np.linspace(self.start[0], self.end[0], self.n_steps)
             self.y_data = np.linspace(self.start[1], self.end[1], self.n_steps)
-            self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('white'), symbolPen=None, clear=True)
-            self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
-            self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
-            self.plot_initialized = True
+            # self.plot(self.x_data, self.y_data, pen=self.pen, symbol='x', symbolSize=10, symbolBrush=QColor('white'), symbolPen=None, clear=self.clear_plot)
+            # self.plot([self.x_data[0]], [self.y_data[0]], pen=None, symbol='o', symbolBrush='g', symbolSize=15)
+            # self.plot([self.x_data[-1]], [self.y_data[-1]], pen=None, symbol='o', symbolBrush='r', symbolSize=15)
+            self.plot_trajectory()
             # Prevent autoscaling of the graph after updating the graph.
             self.viewbox.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=False)
             self.parent.update_position_label(self.start, self.end)
+            if not self.plot_initialized:
+                self.draw_planet()
+            self.plot_initialized = True
 
 
 class MainWindow(QMainWindow):
@@ -145,11 +183,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Real-Time Trajectories")
         self.setAutoFillBackground(True)
         palette = self.palette()
-        color = QColor(20, 20, 100)
-        palette.setColor(QPalette.ColorRole.Window, QColor(color))
+        window_bg_color = QColor(20, 20, 100)
+        palette.setColor(QPalette.ColorRole.Window, window_bg_color)
         self.setPalette(palette)
         self.setMouseTracking(True)
-        self.init_position = ([250, 250], [750, 750])
+        self.planet_radius = 6371
+        self.init_position = ([2 * self.planet_radius, -2 * self.planet_radius], [2 * self.planet_radius, 2 * self.planet_radius])
+        self.init_velocity = ([0, 10], [0, 10])
 
         # The window is split into two main sections; controls on the left, and a graph on the right.
         # The left side will consist of self.tabs for different types of controls, with the self.tabs implemented by QTabWidget.
@@ -165,7 +205,6 @@ class MainWindow(QMainWindow):
         frame = QFrame()
         frame.setFrameShape(QFrame.Shape.Box)
         frame.setLineWidth(2)
-
         widget = QWidget()
         position_layout = QVBoxLayout()
         # Add a label for this box.
@@ -211,12 +250,74 @@ class MainWindow(QMainWindow):
         frame.setLayout(position_layout)
         layout_left_tab1.addWidget(frame)
         self.position_frame = frame
-        self.position_frame.setFixedHeight(int(self.tabs.height() * 0.5))
+        self.position_frame.setFixedHeight(int(self.tabs.height() * 0.3))
 
-        widget = QCheckBox()
-        widget.setCheckState(Qt.CheckState.Checked)
-        widget.stateChanged.connect(self.show_state)
-        layout_left_tab1.addWidget(widget)
+        # Add a velocity section.
+        # Create a frame around the velocity input fields.
+        frame = QFrame()
+        frame.setFrameShape(QFrame.Shape.Box)
+        frame.setLineWidth(2)
+        widget = QWidget()
+        velocity_layout = QVBoxLayout()
+        # Add a label for this box.
+        label = QLabel("Velocity")
+        # Center the label horizontally and align it to the top.
+        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        velocity_layout.addWidget(label)
+        # Add a label and two input fields for the start position.
+        layout = QHBoxLayout()
+        label = QLabel("Start:")
+        self.velocity_label_start_x = QLineEdit()
+        self.velocity_label_start_y = QLineEdit()
+        self.velocity_label_start_x.returnPressed.connect(lambda: self.update_velocity())
+        self.velocity_label_start_y.returnPressed.connect(lambda: self.update_velocity())
+        layout.addWidget(label)
+        layout.addWidget(self.velocity_label_start_x)
+        layout.addWidget(self.velocity_label_start_y)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        velocity_layout.addLayout(layout)
+        # Add a label and two input fields for the end position.
+        layout = QHBoxLayout()
+        label = QLabel("End:")
+        self.velocity_label_end_x = QLineEdit()
+        self.velocity_label_end_y = QLineEdit()
+        self.velocity_label_end_x.returnPressed.connect(lambda: self.update_velocity())
+        self.velocity_label_end_y.returnPressed.connect(lambda: self.update_velocity())
+        layout.addWidget(label)
+        layout.addWidget(self.velocity_label_end_x)
+        layout.addWidget(self.velocity_label_end_y)
+        velocity_layout.addLayout(layout)
+        # Add an apply and reset button.
+        layout = QHBoxLayout()
+        button = QPushButton("Apply")
+        button.clicked.connect(lambda: self.update_velocity())
+        layout.addWidget(button)
+        button = QPushButton("Reset")
+        button.clicked.connect(lambda: self.update_velocity('reset'))
+        layout.addWidget(button)
+        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
+        velocity_layout.addLayout(layout)
+        velocity_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        widget.setLayout(velocity_layout)
+        frame.setLayout(velocity_layout)
+        layout_left_tab1.addWidget(frame)
+        self.velocity_frame = frame
+        self.velocity_frame.setFixedHeight(int(self.tabs.height() * 0.3))
+
+        # Make a slider for the planet radius.
+        layout = QHBoxLayout()
+        self.planet_radius_slider = QSlider()
+        self.planet_radius_slider.setOrientation(Qt.Orientation.Horizontal)
+        self.planet_radius_slider.setRange(1000, 10000)
+        self.planet_radius_slider.setSingleStep(500)
+        self.planet_radius_slider.setValue(6371)
+        self.planet_radius_slider.valueChanged.connect(lambda: self.update_planet_radius(self.planet_radius_slider.value()))
+        layout.addWidget(self.planet_radius_slider)
+        self.planet_radius_widget = QLineEdit()
+        layout.addWidget(self.planet_radius_widget)
+        self.planet_radius_widget.setFixedWidth(100)
+        self.planet_radius_widget.returnPressed.connect(lambda: self.update_planet_radius(self.planet_radius_widget.text()))
+        layout_left_tab1.addLayout(layout)
 
         widget = QPushButton("Click me")
         widget.clicked.connect(self.open_dialog)
@@ -251,12 +352,9 @@ class MainWindow(QMainWindow):
         widget.valueChanged.connect(lambda i: print(f'%.2f' % i))
         layout_left_tab2.addWidget(widget)
 
-        widget = QSlider()
-        widget.setOrientation(Qt.Orientation.Horizontal)
-        widget.setRange(0, 100)
-        widget.setSingleStep(5)
-        widget.setValue(20)
-        widget.valueChanged.connect(lambda i: print(i))
+        widget = QCheckBox()
+        widget.setCheckState(Qt.CheckState.Checked)
+        widget.stateChanged.connect(self.show_state)
         layout_left_tab2.addWidget(widget)
 
         widget_left_tab2 = QWidget()
@@ -267,26 +365,23 @@ class MainWindow(QMainWindow):
         self.tabs.setMinimumSize(400, 300)
         self.tabs.setMaximumSize(800, 600)
         self.tabs.setAutoFillBackground(True)
-        palette = self.tabs.palette()
-        color = (100, 20, 20)
-        palette.setColor(QPalette.ColorRole.Window, QColor(*color))
-        self.tabs.setPalette(palette)
+        # palette = self.tabs.palette()
+        # color = (100, 20, 20)
+        # palette.setColor(QPalette.ColorRole.Window, QColor(*color))
+        # self.tabs.setPalette(palette)
 
         # Add a layout that can be used to display a graph on the right side of the window.
         self.layout_right = QVBoxLayout()
         getLayoutMargins = self.layout_right.getContentsMargins
         self.graph = PlotWidget(parent=self, getLayoutMargins=getLayoutMargins)
         self.layout_right.addWidget(self.graph)
-        color = QColor(50, 50, 50)
-        self.graph.setBackground(color)
-        self.graph.update_graph()
 
         # Set properties of the layout on the right side of the window.
         widget_right = QWidget()
         widget_right.setLayout(self.layout_right)
         widget_right.setMinimumSize(400, 300)
         widget_right.setMaximumSize(800, 600)
-        widget_right.setStyleSheet("background-color: rgb(20, 100, 20)")
+        # widget_right.setStyleSheet("background-color: rgb(20, 100, 20)")
         widget_right.setMouseTracking(True)
 
         # Add the left and right layouts to the main layout of the window.
@@ -305,6 +400,11 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 600)
         self.setMaximumSize(1600, 1200)
         # self.resizeEvent(QResizeEvent(QSize(1000, 600), self.size()))
+
+        # Initialize the LineEdit widgets with the initial values.
+        self.update_position_label()
+        self.update_velocity_label()
+        self.update_planet_radius(self.planet_radius)
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         " Create a custom context menu. "
@@ -374,21 +474,56 @@ class MainWindow(QMainWindow):
         " Print the state of the checkbox. "
         print(f"Checkbox state: {state}")
 
+    def update_planet_radius(self, value=None):
+        " Update the radius of the planet. "
+        if value is not None:
+            value = float(value)
+            if value < self.planet_radius_slider.minimum():
+                value = self.planet_radius_slider.minimum()
+            elif value > self.planet_radius_slider.maximum():
+                value = self.planet_radius_slider.maximum()
+            self.planet_radius = value
+        else:
+            self.planet_radius = float(self.planet_radius_widget.text())
+        self.graph.draw_planet()
+        self.planet_radius_widget.setText(f"%0.2f" % self.planet_radius)
+        self.planet_radius_slider.setValue(int(self.planet_radius))
+
     def update_position(self, flag=None):
         " Update the position of the start and end points. "
         if flag == 'reset':
-            self.position_label_start_x.setText(str(self.init_position[0][0]))
-            self.position_label_start_y.setText(str(self.init_position[0][1]))
-            self.position_label_end_x.setText(str(self.init_position[1][0]))
-            self.position_label_end_y.setText(str(self.init_position[1][1]))
+            self.position_label_start_x.setText(f"%0.3f" % self.init_position[0][0])
+            self.position_label_start_y.setText(f"%0.3f" % self.init_position[0][1])
+            self.position_label_end_x.setText(f"%0.3f" % self.init_position[1][0])
+            self.position_label_end_y.setText(f"%0.3f" % self.init_position[1][1])
         self.graph.update_graph()
 
-    def update_position_label(self, start, end):
+    def update_position_label(self, start=None, end=None):
         " Update the displayed text of the position input fields. "
-        self.position_label_start_x.setText(str(start[0]))
-        self.position_label_start_y.setText(str(start[1]))
-        self.position_label_end_x.setText(str(end[0]))
-        self.position_label_end_y.setText(str(end[1]))
+        start = start if start is not None else self.init_position[0]
+        end = end if end is not None else self.init_position[1]
+        self.position_label_start_x.setText(f"%0.3f" % start[0])
+        self.position_label_start_y.setText(f"%0.3f" % start[1])
+        self.position_label_end_x.setText(f"%0.3f" % end[0])
+        self.position_label_end_y.setText(f"%0.3f" % end[1])
+
+    def update_velocity(self, flag=None):
+        " Update the position of the start and end points. "
+        if flag == 'reset':
+            self.velocity_label_start_x.setText(f"%0.3f" % self.init_velocity[0][0])
+            self.velocity_label_start_y.setText(f"%0.3f" % self.init_velocity[0][1])
+            self.velocity_label_end_x.setText(f"%0.3f" % self.init_velocity[1][0])
+            self.velocity_label_end_y.setText(f"%0.3f" % self.init_velocity[1][1])
+        self.graph.update_graph()
+
+    def update_velocity_label(self, start=None, end=None):
+        " Update the displayed text of the position input fields. "
+        start = start if start is not None else self.init_velocity[0]
+        end = end if end is not None else self.init_velocity[1]
+        self.velocity_label_start_x.setText(f"%0.3f" % start[0])
+        self.velocity_label_start_y.setText(f"%0.3f" % start[1])
+        self.velocity_label_end_x.setText(f"%0.3f" % end[0])
+        self.velocity_label_end_y.setText(f"%0.3f" % end[1])
 
 
 if __name__ == "__main__":
