@@ -10,7 +10,9 @@
                 ".",
                 "-B",
                 "build",
-                "-DCMAKE_INSTALL_PREFIX=${workspaceFolder}"
+                "-DCMAKE_INSTALL_PREFIX=${workspaceFolder}",
+                "-A",
+                "x64"
             ],
             "group": {
                 "kind": "build",
@@ -30,7 +32,7 @@
                 "--target",
                 "install",
                 "--config",
-                "Debug"
+                "Release"
             ],
             "group": {
                 "kind": "build",
@@ -60,6 +62,51 @@
             },
             "problemMatcher": [
                 "$msCompile"
+            ]
+        },
+        {
+            "label": "build_sandbox",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "build",
+                "--target",
+                "install",
+                "--config",
+                "Debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": [
+                "configure"
+            ]
+        },
+        {
+            "label": "test_sandbox",
+            "type": "shell",
+            "command": "cl",
+            "args": [
+                "/std:c++20",
+                "/Zc:__cplusplus",
+                "src\\sandbox.cpp",
+                "/Fe:sandbox.exe",
+                "/EHsc"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "dependsOn": [
+                "build_sandbox"
             ]
         }
     ]

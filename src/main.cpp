@@ -1,7 +1,11 @@
-#include <iostream>
+#include <boost/python.hpp>
 
-int main(int argc, char *argv[])
+std::string greet()
 {
-    std::cout << "Using version: " << __cplusplus << std::endl;
-    return 0;
+    return "Hello, world!";
+}
+
+BOOST_PYTHON_MODULE(pyrtt)
+{
+    boost::python::def("greet", greet);
 }

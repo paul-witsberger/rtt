@@ -20,3 +20,6 @@ documentation/work notes.txt
 
 # Python venv
 /venv_py_rtt/
+
+# Sandbox files for quick tests
+*sandbox*

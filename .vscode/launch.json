@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+        // make a configuration to debug main.cpp
         {
             "name": "Launch rtt",
             "type": "cppvsdbg",
@@ -12,6 +13,19 @@
             "environment": [],
             "externalConsole": true,
             "preLaunchTask": "build"
+        },
+        // make a configuration to debug sandbox.cpp
+        {
+            "name": "Compile sandbox.cpp",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/sandbox.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "preLaunchTask": "test_sandbox"
         }
     ]
 }
