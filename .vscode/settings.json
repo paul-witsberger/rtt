@@ -51,7 +51,7 @@
         "xutility": "cpp"
     },
     "cmake.buildDirectory": "${workspaceFolder}/build",
-    "cmake.cmakePath": "C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe",
+    "cmake.cmakePath": "C:/Qt/Tools/CMake_64/bin/cmake.exe",
     "cmake.installPrefix": "{workspaceFolder}",
     "files.trimTrailingWhitespace": true,
     "editor.formatOnSave": true,
@@ -59,4 +59,5 @@
     "cmake.options.statusBarVisibility": "visible",
     "C_Cpp.default.cppStandard": "c++20",
     "C_Cpp.default.cStandard": "c17",
+    "cmake.configureOnOpen": false,
 }

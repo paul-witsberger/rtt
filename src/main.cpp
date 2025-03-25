@@ -1,8 +1,9 @@
 #include <iostream>
 #include "Display.h"
 #include "Solver.h"
+#include <QTest>
 
-int main(int argc, char *argv[])
+class TestQString : public QObject
 {
     std::cout << "Starting Real-Time Trajectories application..." << std::endl;
 
@@ -27,3 +28,16 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+Q_OBJECT private slots : void
+                         toUpper();
+}
+;
+
+void TestQString::toUpper()
+{
+    QString str = "Hello";
+    QVERIFY(str.toUpper() == "HELLO");
+}
+
+QTEST_MAIN(TestQString)
