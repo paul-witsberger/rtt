@@ -3,8 +3,9 @@
         {
             "name": "rtt",
             "includePath": [
-                "${workspaceFolder}/**"
-                // "${workspaceFolder}/src/widget",
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include",
+                "C:/Users/paul/Documents/codes/boost_1_86_0"
                 // "${QT_DIR}/include"
             ],
             "cppStandard": "c++20",
